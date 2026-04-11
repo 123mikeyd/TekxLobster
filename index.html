@@ -155,22 +155,127 @@ const LOB_ATTACKS = {
 // AI
 // ============================================================
 let aiCooldown = 0;
+let aiAggression = 0.5;  // 0=defensive, 1=aggressive, shifts during fight
+let aiMemory = { playerAttacks: 0, playerBlocks: 0, playerJumps: 0, lastPlayerState: 'idle', whiffPunishTimer: 0 };
+let aiStrafeDir = 1;  // for spacing adjustments
+let aiDecisionTimer = 0;
+
 function getAIInput(ai, player, dt) {
   aiCooldown = Math.max(0, aiCooldown - dt);
+  aiWhiffPunishTimer = Math.max(0, (aiWhiffPunishTimer||0) - dt);
   const dx = player.x - ai.x, dist = Math.abs(dx);
   const inp = {left:false,right:false,jump:false,crouch:false,block:false,light:false,medium:false,heavy:false,special:false};
+
+  // Don't interrupt own actions
   if (ai.state==='ko'||ai.state==='hurt'||ai.state==='attack') return inp;
-  if (dist>160) inp[dx>0?'right':'left']=true;
-  else if (dist<70) inp[dx>0?'left':'right']=true;
-  if (dist<170 && aiCooldown<=0) {
-    const r=Math.random();
-    if      (r<0.04)                { inp.light=true;   aiCooldown=0.35; }
-    else if (r<0.07)                { inp.medium=true;  aiCooldown=0.55; }
-    else if (r<0.09)                { inp.heavy=true;   aiCooldown=0.75; }
-    else if (r<0.10&&ai.energy>=50) { inp.special=true; aiCooldown=1.2;  }
+
+  // Track player behavior
+  if (player.state==='attack' && aiMemory.lastPlayerState!=='attack') aiMemory.playerAttacks++;
+  if (player.state==='block' && aiMemory.lastPlayerState!=='block') aiMemory.playerBlocks++;
+  if (player.state==='jump' && aiMemory.lastPlayerState!=='jump') aiMemory.playerJumps++;
+  aiMemory.lastPlayerState = player.state;
+
+  // Shift aggression based on HP advantage
+  const hpRatio = ai.hp / ai.maxHp;
+  const playerHpRatio = player.hp / player.maxHp;
+  if (hpRatio < 0.3 && playerHpRatio > 0.5) aiAggression = 0.2;  // losing badly, play safe
+  else if (hpRatio > 0.7 && playerHpRatio < 0.3) aiAggression = 0.9;  // winning, press advantage
+  else aiAggression = 0.4 + (hpRatio - playerHpRatio) * 0.3;
+
+  // === DEFENSIVE: Block reactions ===
+  // Block when player is attacking and in range
+  if (player.state==='attack' && dist<180) {
+    const blockChance = player.atkType==='heavy' ? 0.4 : player.atkType==='medium' ? 0.25 : 0.15;
+    if (Math.random() < blockChance && aiCooldown <= 0) {
+      inp.block = true;
+      aiCooldown = 0.15;
+      return inp;
+    }
   }
-  if (player.state==='attack'&&dist<180&&Math.random()<0.03&&aiCooldown<=0) { inp.block=true; aiCooldown=0.2; }
-  if (Math.random()<0.004&&ai.isOnGround&&dist<250) inp.jump=true;
+
+  // === PUNISH WHIFFED ATTACKS ===
+  // If player just finished an attack and is in recovery, rush in
+  if (player.state==='idle' && aiMemory.lastPlayerState==='attack' && dist < 250) {
+    aiWhiffPunishTimer = 0.4;  // punish window
+  }
+  if (aiWhiffPunishTimer > 0 && dist < 180 && aiCooldown <= 0) {
+    // Rush in and punish with heavy
+    inp[dx>0?'right':'left'] = true;
+    if (dist < 130) {
+      const r = Math.random();
+      if (r < 0.5) { inp.heavy = true; aiCooldown = 0.8; }
+      else { inp.medium = true; aiCooldown = 0.6; }
+    }
+    return inp;
+  }
+
+  // === MOVEMENT ===
+  // Preferred distance depends on aggression and energy
+  const preferredDist = aiAggression > 0.6 ? 90 : (ai.energy >= 50 ? 140 : 110);
+
+  if (dist > preferredDist + 40) {
+    inp[dx>0?'right':'left'] = true;  // approach
+  } else if (dist < preferredDist - 40) {
+    inp[dx>0?'left':'right'] = true;  // back up
+  } else {
+    // In sweet spot -- occasional strafe for mix-up
+    aiDecisionTimer -= dt;
+    if (aiDecisionTimer <= 0) {
+      aiStrafeDir = Math.random() < 0.3 ? -aiStrafeDir : aiStrafeDir;
+      aiDecisionTimer = 0.3 + Math.random() * 0.5;
+    }
+    if (Math.random() < 0.3) inp[aiStrafeDir>0?'right':'left'] = true;
+  }
+
+  // === JUMPING ===
+  // Jump to avoid projectiles or for mix-up
+  const oppProjectile = projectiles.some(p => p.alive && p.owner === player && Math.abs(p.x - ai.x) < 150);
+  if (oppProjectile && ai.isOnGround && Math.random() < 0.4) {
+    inp.jump = true;
+  } else if (Math.random() < 0.003 && ai.isOnGround && dist < 200 && aiAggression > 0.5) {
+    inp.jump = true;  // occasional jump-in for mix-up
+  }
+
+  // === ATTACKING ===
+  if (dist < 170 && aiCooldown <= 0 && !inp.block) {
+    const r = Math.random();
+
+    // Close range: mix up attacks
+    if (dist < 100) {
+      // In combo range - use lights to start combos
+      if (r < 0.12 * aiAggression) {
+        inp.light = true; aiCooldown = 0.3;
+      } else if (r < 0.18 * aiAggression) {
+        inp.medium = true; aiCooldown = 0.5;
+      } else if (r < 0.22 * aiAggression) {
+        inp.heavy = true; aiCooldown = 0.7;
+      } else if (r < 0.24 && ai.energy >= 50) {
+        // Use special as combo ender when close
+        inp.special = true; aiCooldown = 1.0;
+      }
+    }
+    // Mid range: poke with medium/heavy
+    else if (dist < 150) {
+      if (r < 0.06 * aiAggression) {
+        inp.medium = true; aiCooldown = 0.5;
+      } else if (r < 0.10 * aiAggression) {
+        inp.heavy = true; aiCooldown = 0.7;
+      } else if (r < 0.12 && ai.energy >= 50) {
+        inp.special = true; aiCooldown = 1.0;
+      }
+    }
+    // Max range: only specials reach
+    else if (ai.energy >= 50 && r < 0.04) {
+      inp.special = true; aiCooldown = 1.2;
+    }
+  }
+
+  // === CROUCH ===
+  // Crouch to bait jump-ins occasionally
+  if (dist > 120 && dist < 200 && Math.random() < 0.01) {
+    inp.crouch = true;
+  }
+
   return inp;
 }
 
@@ -196,6 +301,29 @@ function spawnFloat(text, x, y, color) { floats.push({text,x,y,vy:-60,age:0,life
 function rectsOverlap(a,b) { return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y; }
 
 // ============================================================
+// COMBO SYSTEM
+// ============================================================
+// Each fighter tracks their own combo (hits THEY land on opponent)
+const comboState = [
+  { count: 0, timer: 0, damage: 0, maxTimer: 0.8 },  // fighter 0's combo on opponent
+  { count: 0, timer: 0, damage: 0, maxTimer: 0.8 },  // fighter 1's combo on opponent
+];
+// Damage scaling: combos deal less damage per hit to prevent infinite juggles
+function getComboDamageScale(comboCount) {
+  if (comboCount <= 0) return 1.0;
+  if (comboCount === 1) return 1.0;
+  if (comboCount === 2) return 0.9;
+  if (comboCount === 3) return 0.75;
+  if (comboCount === 4) return 0.6;
+  return 0.5;  // cap at 50% damage for 5+ hit combos
+}
+// Hitstun scaling: more hits = less stun so opponent can escape
+function getComboHitstun(baseStun, comboCount) {
+  if (comboCount <= 1) return baseStun;
+  return Math.max(0.12, baseStun * (1 - comboCount * 0.08));
+}
+
+// ============================================================
 // FIGHTER CLASS
 // ============================================================
 class Fighter {
@@ -209,6 +337,7 @@ class Fighter {
     this.animF=0; this.animT=0; this.walkF=0; this.walkT=0;
     this.jumpF=0; this.isOnGround=true; this.rounds=0; this._koAge=0;
     this.charType=(name==='TEKNIUM')?'tek':'lob';
+    this._canCancel=false; this._cancelTimer=0;  // combo cancel window
   }
   get hitbox() { return {x:this.x-this.w/2,y:this.y-this.h,w:this.w,h:this.h}; }
   atkHitbox() {
@@ -217,19 +346,35 @@ class Fighter {
     if (af<a.startup||af>=a.startup+a.active) return null;
     return {x:this.x+(a.hitOX*this.facing)-a.hitW/2,y:this.y+a.hitOY,w:a.hitW,h:a.hitH};
   }
-  receiveHit(atk, atkFacing) {
+  receiveHit(atk, atkFacing, attackerId) {
     if (this.state==='ko') return false;
     if (this.state==='block'||this.blockTimer>0) {
       this.hp=Math.max(this.hp-Math.floor(atk.damage*0.1),0);
       playSound('block'); spawnFloat('BLOCK',this.x,this.y-160,'#88aaff'); return true;
     }
-    if (this.state==='hurt'&&this.hurtTimer>0.1) return false;
-    this.hp=Math.max(this.hp-atk.damage,0);
-    this.hurtTimer=0.35; this.state='hurt';
+    // Combo system: track hits on this fighter
+    const cid = attackerId !== undefined ? attackerId : (this.id === 0 ? 1 : 0);
+    const cs = comboState[cid];
+    cs.count++;
+    cs.timer = cs.maxTimer;
+    // Apply damage scaling
+    const scaledDamage = Math.ceil(atk.damage * getComboDamageScale(cs.count));
+    cs.damage += scaledDamage;
+    // Hitstun scales down per combo hit so opponent can eventually escape
+    const baseStun = 0.35;
+    const stunDuration = cs.count <= 1 ? baseStun : getComboHitstun(baseStun, cs.count);
+    this.hp=Math.max(this.hp-scaledDamage,0);
+    this.hurtTimer=stunDuration; this.state='hurt';
     this.kbVx=atkFacing*atk.pushback;
     if (atk.knockback>0) this.kbVy=-atk.knockback*6;
     playSound('hit'); triggerHitFlash();
-    spawnFloat('-'+atk.damage,this.x,this.y-170,'#ff4444');
+    // Show combo count if 2+
+    if (cs.count >= 2) {
+      spawnFloat(cs.count+' HIT!',this.x,this.y-200,'#ffcc00');
+      spawnFloat('-'+scaledDamage,this.x,this.y-170,'#ff4444');
+    } else {
+      spawnFloat('-'+scaledDamage,this.x,this.y-170,'#ff4444');
+    }
     if (this.hp<=0) { this.state='ko'; playSound('ko'); triggerShake(); }
     return true;
   }
@@ -254,14 +399,44 @@ class Fighter {
       if(!this.atkHit){
         const ahb=this.atkHitbox();
         if(ahb&&rectsOverlap(ahb,opp.hitbox)){
-          if(opp.receiveHit(a,this.facing)){this.atkHit=true;this.energy=Math.min(this.maxEnergy,this.energy+15);}
+          if(opp.receiveHit(a,this.facing,this.id)){
+            this.atkHit=true;
+            this.energy=Math.min(this.maxEnergy,this.energy+15);
+            // COMBO: on hit, allow canceling into next attack if input is held
+            // Only light and medium can be chained (not heavy or special)
+            this._canCancel=true;  // brief window to input next attack
+            this._cancelTimer=0.15;
+          }
         }
         if(a.isSpecial&&this.atkFrame===a.startup+2&&this.energy>=50){
           projectiles.push({owner:this,x:this.x+this.facing*60,y:this.y-130,vx:this.facing*700,vy:0,w:80,h:20,damage:a.damage,alive:true,age:0});
           this.energy-=50;
         }
       }
-      if(this.atkFrame>=a.startup+a.active+a.recovery){this.state='idle';this.atkType=null;this.atkFrame=0;this.atkHit=false;}
+      if(this.atkFrame>=a.startup+a.active+a.recovery){this.state='idle';this.atkType=null;this.atkFrame=0;this.atkHit=false;this._canCancel=false;this._cancelTimer=0;}
+      // COMBO CANCEL: during hit advantage window, check for new attack input
+      if(this._canCancel){
+        this._cancelTimer-=dt;
+        if(this._cancelTimer<=0){this._canCancel=false;}
+        else {
+          // Check for cancel into stronger attack (light->medium, medium->heavy)
+          // or into special (any->special)
+          const nextAtks = this.atkType==='light' ? ['medium'] : this.atkType==='medium' ? ['heavy'] : [];
+          for(const na of nextAtks){
+            if(inp[na]){
+              this.state='attack';this.atkType=na;this.atkFrame=0;this.atkHit=false;
+              this._canCancel=false;this._cancelTimer=0;
+              playSound(this.atks[na].sound);break;
+            }
+          }
+          // Special cancel from any hit
+          if(inp.special&&this.energy>=50){
+            this.state='attack';this.atkType='special';this.atkFrame=0;this.atkHit=false;
+            this._canCancel=false;this._cancelTimer=0;
+            playSound('special');
+          }
+        }
+      }
       return;
     }
     if(inp.block){this.state='block';this.blockTimer=0.12;this.vx=0;return;}
@@ -396,6 +571,18 @@ function drawHUD(f0,f1) {
   ctx.font='bold 30px Courier New';ctx.textAlign='center';
   ctx.fillText(Math.ceil(roundTimer),W/2,50);
   ctx.fillStyle='#888';ctx.font='10px Courier New';ctx.fillText('RD '+roundNum,W/2,8);
+  // Combo counters
+  for(let ci=0;ci<2;ci++){
+    const cs=comboState[ci];
+    if(cs.count>=2){
+      const cx=ci===0?30:W-330;
+      const align=ci===0?'left':'right';
+      ctx.fillStyle='#ffcc00';ctx.font='bold 16px Courier New';ctx.textAlign=align;
+      ctx.fillText(cs.count+' HIT COMBO',cx+(ci===0?0:300),90);
+      ctx.fillStyle='#ff8888';ctx.font='bold 12px Courier New';
+      ctx.fillText(cs.damage+' dmg',cx+(ci===0?0:300),105);
+    }
+  }
 }
 
 // ============================================================
@@ -561,6 +748,9 @@ function startMatch(playerChar) {
   roundTimer=99;introTimer=3;
   projectiles.length=0;floats.length=0;
   hitFlash=0;shakeTimer=0;
+  // Reset combos
+  comboState[0].count=0;comboState[0].timer=0;comboState[0].damage=0;
+  comboState[1].count=0;comboState[1].timer=0;comboState[1].damage=0;
   gameState='intro';playSound('ready');
 }
 
@@ -612,6 +802,10 @@ function loop(ts){
     projectiles.splice(0,projectiles.length,...projectiles.filter(p=>p.alive));
     for(const f of floats){f.y+=f.vy*dt;f.age+=dt;}
     floats.splice(0,floats.length,...floats.filter(f=>f.age<f.life));
+    // Tick combo timers - reset combo if timer expires (opponent escaped)
+    for(const cs of comboState){
+      if(cs.count>0){cs.timer-=dt;if(cs.timer<=0){cs.count=0;cs.damage=0;cs.timer=0;}}
+    }
     roundTimer-=dt;
     if(f0.state==='ko'||f1.state==='ko'||roundTimer<=0){
       winner=f0.state==='ko'?f1:f1.state==='ko'?f0:f0.hp>=f1.hp?f0:f1;
