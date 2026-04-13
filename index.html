@@ -226,8 +226,8 @@ function setupPeerConn(conn){
 function beginMpMatch(){
   const myChar=csCur, oppChar=mpOppChar;
   const pN=myChar===0?'TEKNIUM':'LOBSTER', cN=oppChar===0?'TEKNIUM':'LOBSTER';
-  const pA=myChar===0?TEK_ATK:LOB_ATK, cA=oppChar===0?LOB_ATK:TEK_ATK;
-  const pC=myChar===0?'tek':'lob', cC=oppChar===0?'lob':'tek';
+  const pA=myChar===0?TEK_ATK:LOB_ATK, cA=oppChar===0?TEK_ATK:LOB_ATK;
+  const pC=myChar===0?'tek':'lob', cC=oppChar===0?'tek':'lob';
   ftr=[new Fighter(0,300,pN,pA,1,false,pC),new Fighter(1,W-300,cN,cA,-1,false,cC)];
   ftr[0].rounds=sRds[0];ftr[1].rounds=sRds[1];
   roundT=ROUND_TIME;introT=3;projs.length=0;floats.length=0;particles.length=0;
