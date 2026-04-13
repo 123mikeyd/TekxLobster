@@ -902,7 +902,10 @@ function loop(ts){
       localInputs[localFrame]=myInp;
       sendInput(localFrame,myInp);
       f0.update(dt,myInp,f1);
-      f1.update(dt,netInput(localFrame-INPUT_DELAY),f0);
+      // Mirror left/right — remote player's "right" is our "left" since they're on the opposite side
+      const ri=netInput(localFrame-INPUT_DELAY);
+      const mirrored={...ri, l:ri.r, r:ri.l};
+      f1.update(dt,mirrored,f0);
       // Cleanup old frames
       for(const k in remoteInputs)if(+k<localFrame-120)delete remoteInputs[k];
       for(const k in localInputs)if(+k<localFrame-120)delete localInputs[k];
