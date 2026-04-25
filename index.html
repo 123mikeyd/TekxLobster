@@ -225,10 +225,8 @@ function setupPeerConn(conn){
 
 function beginMpMatch(){
   const myChar=csCur, oppChar=mpOppChar;
-  const pN=myChar===0?'TEKNIUM':'LOBSTER', cN=oppChar===0?'TEKNIUM':'LOBSTER';
-  const pA=myChar===0?TEK_ATK:LOB_ATK, cA=oppChar===0?TEK_ATK:LOB_ATK;
-  const pC=myChar===0?'tek':'lob', cC=oppChar===0?'tek':'lob';
-  ftr=[new Fighter(0,300,pN,pA,1,false,pC),new Fighter(1,W-300,cN,cA,-1,false,cC)];
+  const pDef=ROSTER[myChar], cDef=ROSTER[oppChar];
+  ftr=[new Fighter(0,300,pDef,1,false),new Fighter(1,W-300,cDef,-1,false)];
   ftr[0].rounds=sRds[0];ftr[1].rounds=sRds[1];
   roundT=ROUND_TIME;introT=3;projs.length=0;floats.length=0;particles.length=0;
   hitFlash=0;shakeT=0;slowMo=0;
@@ -266,7 +264,7 @@ function leaveLobby(){
 // ── Asset Loading ──────────────────────────────────────────────
 const sheets={};
 let loaded=0;
-const TOTAL=7;
+const TOTAL=9;
 
 function chromaKey(img){
   const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
@@ -283,9 +281,9 @@ function chromaKey(img){
   cx.putImageData(id,0,0);return c;
 }
 
-function loadSheet(key,src){
+function loadSheet(key,src,isRGBA){
   const img=new Image();
-  img.onload=()=>{sheets[key]=chromaKey(img);loaded++};
+  img.onload=()=>{sheets[key]=isRGBA?img:chromaKey(img);loaded++};
   img.onerror=()=>{console.error('FAIL:'+src);loaded++};
   img.src=src;
 }
@@ -302,44 +300,133 @@ loadSheet('tekFX','sprites/Tek_toomany_specialeffects.jpg');
 loadSheet('lob','sprites/Lob_01.jpg');
 loadSheet('lobX','sprites/Lob_jumpAttackcrouch_attacks.jpg');
 loadSheet('lobK','sprites/Lob_SpiningJumpKick.jpg');
+loadSheet('cat','sprites/NekoCat.png',true);
+loadSheet('hero','sprites/MartialHero.png',true);
 loadBG('sprites/stage.png');
 
-// ── Sprite Frame Maps ──────────────────────────────────────────
-const T={
-  idle:[['tek',28,53,80,171],['tek',137,53,81,171],['tek',248,53,81,171],['tek',359,53,81,171]],
-  walkF:[['tek',493,53,78,171],['tek',611,53,80,171],['tek',720,53,86,171],['tek',842,53,90,171],['tek',971,53,81,171],['tek',1094,53,78,171]],
-  walkB:[['tek',23,250,82,196],['tek',105,250,82,196],['tek',187,250,82,196],['tek',269,250,82,196]],
-  jump:[['tek',518,250,110,196],['tek',628,250,110,196],['tek',750,250,111,196]],
-  crouch:[['tek',935,250,106,196],['tek',1041,250,105,196]],
-  light:[['tek',33,529,90,143],['tek',154,529,143,143],['tek',305,529,94,143]],
-  heavy:[['tek',438,529,327,143],['tek',794,529,324,143],['tek',1127,529,98,143]],
-  medium:[['tekX',433,432,73,117],['tekX',536,432,66,117],['tekX',627,432,69,117],['tekX',704,432,94,117]],
-  special:[['tek',34,756,143,144],['tek',206,756,109,144],['tek',382,756,98,144],['tek',491,756,157,144],['tek',655,756,378,144]],
-  block:[['tek',45,1016,78,160],['tek',183,1016,82,160]],
-  hurt:[['tek',370,1016,108,160],['tek',529,1016,96,160]],
-  ko:[['tek',714,1016,106,160],['tek',847,1016,149,160],['tek',1031,1016,179,160]],
-  uppercut:[['tekX',28,579,283,160],['tekX',319,579,85,160],['tekX',444,579,96,160],['tekX',594,579,96,160],['tekX',757,579,73,160]],
-  crouchAtk:[['tekX',34,828,79,129],['tekX',161,828,124,129],['tekX',319,828,124,129],['tekX',472,828,124,129]],
-  jumpAtk:[['tekX',648,828,78,129],['tekX',750,828,100,129],['tekX',886,828,67,129]],
-};
-
-const L={
-  idle:[['lob',20,46,76,134],['lob',105,46,77,134],['lob',194,46,78,134],['lob',282,46,80,134]],
-  walkF:[['lob',405,46,79,134],['lob',484,46,79,134],['lob',563,46,79,134],['lob',642,46,79,134],['lob',721,46,79,134],['lob',800,46,76,134]],
-  walkB:[['lob',23,206,83,161],['lob',106,206,83,161],['lob',189,206,83,161],['lob',278,206,80,161]],
-  jump:[['lob',398,206,103,161],['lob',501,206,103,161],['lob',604,206,102,161]],
-  crouch:[['lob',750,206,114,161],['lob',864,206,114,161]],
-  light:[['lob',20,440,121,127],['lob',177,440,125,127],['lob',344,440,121,127],['lob',516,440,113,127],['lob',659,440,130,127]],
-  heavy:[['lob',20,639,122,125],['lob',162,639,130,125],['lob',309,639,122,125],['lob',451,639,115,125],['lob',596,639,110,125],['lob',724,639,112,125]],
-  medium:[['lobX',19,89,184,197],['lobX',238,89,145,197],['lobX',450,89,127,197],['lobX',624,89,158,197],['lobX',856,89,123,197]],
-  special:[['lobK',228,101,119,211],['lobK',430,101,121,211],['lobK',645,101,121,211],['lobK',860,101,108,211]],
-  block:[['lob',18,852,90,126],['lob',131,852,90,126]],
-  hurt:[['lob',295,852,92,126],['lob',423,852,88,126]],
-  ko:[['lob',548,852,103,126],['lob',677,852,121,126],['lob',828,852,169,126]],
-  crouchAtk:[['lobX',27,410,137,169],['lobX',250,410,122,169],['lobX',415,410,183,169],['lobX',620,410,163,169],['lobX',856,410,123,169]],
-  jumpAtk:[['lobX',26,706,137,199],['lobX',203,706,156,199],['lobX',377,706,137,199],['lobX',534,706,155,199],['lobX',696,706,151,199],['lobX',865,706,132,199]],
-  uppercut:[['lobK',224,448,98,168],['lobK',400,448,180,168],['lobK',609,448,183,168],['lobK',866,448,108,168]],
-};
+// ── Character Roster ──────────────────────────────────────────────
+const ROSTER=[
+  {
+    name:'TEKNIUM', ct:'tek', color:'#00ff88', sub:'Energy Blast • Fast Combos • Uppercut',
+    scale:.85,
+    map:{
+      idle:[['tek',28,53,80,171],['tek',137,53,81,171],['tek',248,53,81,171],['tek',359,53,81,171]],
+      walkF:[['tek',493,53,78,171],['tek',611,53,80,171],['tek',720,53,86,171],['tek',842,53,90,171],['tek',971,53,81,171],['tek',1094,53,78,171]],
+      walkB:[['tek',23,250,82,196],['tek',105,250,82,196],['tek',187,250,82,196],['tek',269,250,82,196]],
+      jump:[['tek',518,250,110,196],['tek',628,250,110,196],['tek',750,250,111,196]],
+      crouch:[['tek',935,250,106,196],['tek',1041,250,105,196]],
+      light:[['tek',33,529,90,143],['tek',154,529,143,143],['tek',305,529,94,143]],
+      heavy:[['tek',438,529,327,143],['tek',794,529,324,143],['tek',1127,529,98,143]],
+      medium:[['tekX',433,432,73,117],['tekX',536,432,66,117],['tekX',627,432,69,117],['tekX',704,432,94,117]],
+      special:[['tek',34,756,143,144],['tek',206,756,109,144],['tek',382,756,98,144],['tek',491,756,157,144],['tek',655,756,378,144]],
+      block:[['tek',45,1016,78,160],['tek',183,1016,82,160]],
+      hurt:[['tek',370,1016,108,160],['tek',529,1016,96,160]],
+      ko:[['tek',714,1016,106,160],['tek',847,1016,149,160],['tek',1031,1016,179,160]],
+      uppercut:[['tekX',28,579,283,160],['tekX',319,579,85,160],['tekX',444,579,96,160],['tekX',594,579,96,160],['tekX',757,579,73,160]],
+      crouchAtk:[['tekX',34,828,79,129],['tekX',161,828,124,129],['tekX',319,828,124,129],['tekX',472,828,124,129]],
+      jumpAtk:[['tekX',648,828,78,129],['tekX',750,828,100,129],['tekX',886,828,67,129]],
+    },
+    atks:{
+      light:  {su:3,ac:4,re:7,  dmg:8,  push:90,  kb:0,  hw:90, hh:65, hx:55, hy:-90,  snd:'whoosh',anim:'light'},
+      medium: {su:5,ac:5,re:10, dmg:14, push:140, kb:0,  hw:105,hh:75, hx:65, hy:-100, snd:'hit',   anim:'medium'},
+      heavy:  {su:8,ac:6,re:14, dmg:22, push:180, kb:55, hw:140,hh:90, hx:60, hy:-110, snd:'hit',   anim:'heavy'},
+      special:{su:10,ac:28,re:18,dmg:30,push:200, kb:80, hw:340,hh:65, hx:80, hy:-100, snd:'special',anim:'special',proj:true},
+      upper:  {su:4,ac:8,re:12, dmg:20, push:100, kb:120,hw:80, hh:130,hx:40, hy:-140, snd:'uppercut',anim:'uppercut'},
+      crouchA:{su:4,ac:5,re:9,  dmg:10, push:70,  kb:0,  hw:100,hh:50, hx:55, hy:-35,  snd:'whoosh',anim:'crouchAtk'},
+      jumpA:  {su:3,ac:5,re:8,  dmg:12, push:110, kb:35, hw:100,hh:90, hx:50, hy:-80,  snd:'hit',   anim:'jumpAtk'},
+    }
+  },
+  {
+    name:'LOBSTER', ct:'lob', color:'#ff6644', sub:'Beam Cannon • Heavy Damage • Flying Kick',
+    scale:1.0,
+    map:{
+      idle:[['lob',20,46,76,134],['lob',105,46,77,134],['lob',194,46,78,134],['lob',282,46,80,134]],
+      walkF:[['lob',405,46,79,134],['lob',484,46,79,134],['lob',563,46,79,134],['lob',642,46,79,134],['lob',721,46,79,134],['lob',800,46,76,134]],
+      walkB:[['lob',23,206,83,161],['lob',106,206,83,161],['lob',189,206,83,161],['lob',278,206,80,161]],
+      jump:[['lob',398,206,103,161],['lob',501,206,103,161],['lob',604,206,102,161]],
+      crouch:[['lob',750,206,114,161],['lob',864,206,114,161]],
+      light:[['lob',20,440,121,127],['lob',177,440,125,127],['lob',344,440,121,127],['lob',516,440,113,127],['lob',659,440,130,127]],
+      heavy:[['lob',20,639,122,125],['lob',162,639,130,125],['lob',309,639,122,125],['lob',451,639,115,125],['lob',596,639,110,125],['lob',724,639,112,125],['lob',842,639,115,125]],
+      medium:[['lobX',19,89,184,197],['lobX',238,89,145,197],['lobX',450,89,127,197],['lobX',624,89,158,197],['lobX',856,89,123,197]],
+      special:[['lobK',228,101,119,211],['lobK',430,101,121,211],['lobK',645,101,121,211],['lobK',860,101,108,211]],
+      block:[['lob',18,852,90,126],['lob',131,852,90,126]],
+      hurt:[['lob',295,852,92,126],['lob',423,852,88,126]],
+      ko:[['lob',548,852,103,126],['lob',677,852,121,126],['lob',828,852,169,126]],
+      crouchAtk:[['lobX',27,410,137,169],['lobX',250,410,122,169],['lobX',415,410,183,169],['lobX',620,410,163,169],['lobX',856,410,123,169]],
+      jumpAtk:[['lobX',26,706,137,199],['lobX',203,706,156,199],['lobX',377,706,137,199],['lobX',534,706,155,199],['lobX',696,706,151,199],['lobX',865,706,132,199]],
+      uppercut:[['lobK',224,448,98,168],['lobK',400,448,180,168],['lobK',609,448,183,168],['lobK',866,448,108,168]],
+    },
+    atks:{
+      light:  {su:4,ac:4,re:8,  dmg:9,  push:100, kb:0,  hw:100,hh:70, hx:55, hy:-80,  snd:'whoosh',anim:'light'},
+      medium: {su:6,ac:6,re:11, dmg:16, push:150, kb:10, hw:120,hh:90, hx:65, hy:-100, snd:'hit',   anim:'medium'},
+      heavy:  {su:9,ac:7,re:15, dmg:26, push:200, kb:65, hw:145,hh:100,hx:60, hy:-105, snd:'hit',   anim:'heavy'},
+      special:{su:12,ac:22,re:22,dmg:34,push:240, kb:100,hw:170,hh:140,hx:70, hy:-130, snd:'special',anim:'special',proj:true},
+      upper:  {su:5,ac:8,re:13, dmg:22, push:110, kb:130,hw:90, hh:140,hx:40, hy:-150, snd:'uppercut',anim:'uppercut'},
+      crouchA:{su:5,ac:5,re:10, dmg:11, push:80,  kb:0,  hw:110,hh:55, hx:55, hy:-30,  snd:'whoosh',anim:'crouchAtk'},
+      jumpA:  {su:4,ac:6,re:9,  dmg:14, push:130, kb:45, hw:120,hh:100,hx:50, hy:-70,  snd:'hit',   anim:'jumpAtk'},
+    }
+  },
+  {
+    name:'NEKOCAT', ct:'cat', color:'#ff88cc', sub:'Nine Lives • Claw Swipes • Spin Kick',
+    scale:3.0,
+    map:{
+      idle:[['cat',0,0,50,50],['cat',50,0,50,50],['cat',100,0,50,50],['cat',150,0,50,50]],
+      walkF:[['cat',0,50,50,50],['cat',50,50,50,50],['cat',100,50,50,50],['cat',150,50,50,50]],
+      walkB:[['cat',0,50,50,50],['cat',50,50,50,50],['cat',100,50,50,50],['cat',150,50,50,50]],
+      jump:[['cat',0,100,50,50],['cat',50,100,50,50],['cat',100,100,50,50],['cat',150,100,50,50],['cat',200,100,50,50],['cat',250,100,50,50],['cat',300,100,50,50],['cat',350,100,50,50],['cat',400,100,50,50],['cat',450,100,50,50],['cat',500,100,50,50],['cat',550,100,50,50],['cat',600,100,50,50],['cat',650,100,50,50]],
+      crouch:[['cat',0,0,50,50],['cat',50,0,50,50]],
+      light:[['cat',0,200,50,50],['cat',50,200,50,50],['cat',100,200,50,50],['cat',150,200,50,50],['cat',200,200,50,50],['cat',250,200,50,50],['cat',300,200,50,50],['cat',350,200,50,50],['cat',400,200,50,50],['cat',450,200,50,50],['cat',500,200,50,50],['cat',550,200,50,50],['cat',600,200,50,50],['cat',650,200,50,50],['cat',700,200,50,50],['cat',750,200,50,50],['cat',800,200,50,50],['cat',850,200,50,50],['cat',900,200,50,50]],
+      medium:[['cat',0,250,50,50],['cat',50,250,50,50],['cat',100,250,50,50],['cat',150,250,50,50],['cat',200,250,50,50],['cat',250,250,50,50],['cat',300,250,50,50],['cat',350,250,50,50],['cat',400,250,50,50],['cat',450,250,50,50],['cat',500,250,50,50],['cat',550,250,50,50]],
+      heavy:[['cat',0,300,50,50],['cat',50,300,50,50],['cat',100,300,50,50],['cat',150,300,50,50],['cat',200,300,50,50],['cat',250,300,50,50],['cat',300,300,50,50],['cat',350,300,50,50],['cat',400,300,50,50],['cat',450,300,50,50],['cat',500,300,50,50],['cat',550,300,50,50],['cat',600,300,50,50],['cat',650,300,50,50]],
+      special:[['cat',0,350,50,50],['cat',50,350,50,50],['cat',100,350,50,50],['cat',150,350,50,50],['cat',200,350,50,50],['cat',250,350,50,50],['cat',300,350,50,50],['cat',350,350,50,50],['cat',400,350,50,50],['cat',450,350,50,50],['cat',500,350,50,50],['cat',550,350,50,50],['cat',600,350,50,50],['cat',650,350,50,50],['cat',700,350,50,50],['cat',750,350,50,50],['cat',800,350,50,50],['cat',850,350,50,50]],
+      block:[['cat',0,600,50,50],['cat',50,600,50,50]],
+      hurt:[['cat',0,550,50,50],['cat',50,550,50,50],['cat',100,550,50,50],['cat',150,550,50,50]],
+      ko:[['cat',0,150,50,50],['cat',50,150,50,50],['cat',100,150,50,50],['cat',150,150,50,50],['cat',200,150,50,50],['cat',250,150,50,50],['cat',300,150,50,50],['cat',350,150,50,50],['cat',400,150,50,50]],
+      uppercut:[['cat',0,400,50,50],['cat',50,400,50,50],['cat',100,400,50,50],['cat',150,400,50,50],['cat',200,400,50,50],['cat',250,400,50,50],['cat',300,400,50,50],['cat',350,400,50,50],['cat',400,400,50,50],['cat',450,400,50,50],['cat',500,400,50,50],['cat',550,400,50,50],['cat',600,400,50,50],['cat',650,400,50,50],['cat',700,400,50,50],['cat',750,400,50,50],['cat',800,400,50,50],['cat',850,400,50,50],['cat',900,400,50,50],['cat',950,400,50,50],['cat',1000,400,50,50],['cat',1050,400,50,50],['cat',1100,400,50,50],['cat',1150,400,50,50]],
+      crouchAtk:[['cat',0,450,50,50],['cat',50,450,50,50],['cat',100,450,50,50],['cat',150,450,50,50],['cat',200,450,50,50],['cat',250,450,50,50],['cat',300,450,50,50],['cat',350,450,50,50]],
+      jumpAtk:[['cat',0,500,50,50],['cat',50,500,50,50],['cat',100,500,50,50],['cat',150,500,50,50],['cat',200,500,50,50],['cat',250,500,50,50],['cat',300,500,50,50],['cat',350,500,50,50],['cat',400,500,50,50],['cat',450,500,50,50],['cat',500,500,50,50],['cat',550,500,50,50],['cat',600,500,50,50],['cat',650,500,50,50]],
+    },
+    atks:{
+      light:  {su:3,ac:4,re:6,  dmg:7,  push:80,  kb:0,  hw:60, hh:40, hx:35, hy:-30,  snd:'whoosh',anim:'light'},
+      medium: {su:5,ac:5,re:9,  dmg:12, push:120, kb:0,  hw:70, hh:45, hx:40, hy:-35,  snd:'hit',   anim:'medium'},
+      heavy:  {su:7,ac:6,re:12, dmg:20, push:160, kb:50, hw:85, hh:55, hx:40, hy:-40,  snd:'hit',   anim:'heavy'},
+      special:{su:9,ac:24,re:16, dmg:28, push:180, kb:70, hw:200,hh:45, hx:60, hy:-35,  snd:'special',anim:'special',proj:true},
+      upper:  {su:4,ac:7,re:10, dmg:18, push:90,  kb:100,hw:55, hh:90, hx:30, hy:-50,  snd:'uppercut',anim:'uppercut'},
+      crouchA:{su:3,ac:4,re:7,  dmg:8,  push:60,  kb:0,  hw:70, hh:35, hx:35, hy:-15,  snd:'whoosh',anim:'crouchAtk'},
+      jumpA:  {su:3,ac:4,re:7,  dmg:10, push:100, kb:30, hw:75, hh:60, hx:35, hy:-30,  snd:'hit',   anim:'jumpAtk'},
+    }
+  },
+  {
+    name:'MARTIAL HERO', ct:'hero', color:'#4488ff', sub:'Karate Master • Balanced • Strong Kicks',
+    scale:.8,
+    map:{
+      idle:[['hero',0,0,200,200],['hero',200,0,200,200],['hero',400,0,200,200],['hero',600,0,200,200],['hero',800,0,200,200],['hero',1000,0,200,200],['hero',1200,0,200,200],['hero',1400,0,200,200]],
+      walkF:[['hero',0,200,200,200],['hero',200,200,200,200],['hero',400,200,200,200],['hero',600,200,200,200],['hero',800,200,200,200],['hero',1000,200,200,200],['hero',1200,200,200,200],['hero',1400,200,200,200]],
+      walkB:[['hero',0,200,200,200],['hero',200,200,200,200],['hero',400,200,200,200],['hero',600,200,200,200],['hero',800,200,200,200],['hero',1000,200,200,200],['hero',1200,200,200,200],['hero',1400,200,200,200]],
+      jump:[['hero',0,400,100,200],['hero',100,400,100,200],['hero',200,400,100,200],['hero',300,400,100,200]],
+      crouch:[['hero',0,600,100,200],['hero',100,600,100,200],['hero',200,600,100,200],['hero',300,600,100,200]],
+      light:[['hero',0,800,200,200],['hero',200,800,200,200],['hero',400,800,200,200],['hero',600,800,200,200],['hero',800,800,200,200],['hero',1000,800,200,200]],
+      heavy:[['hero',0,1000,200,200],['hero',200,1000,200,200],['hero',400,1000,200,200],['hero',600,1000,200,200],['hero',800,1000,200,200],['hero',1000,1000,200,200]],
+      medium:[['hero',0,800,200,200],['hero',200,800,200,200],['hero',400,800,200,200],['hero',600,800,200,200],['hero',800,800,200,200],['hero',1000,800,200,200]],
+      special:[['hero',0,1000,200,200],['hero',200,1000,200,200],['hero',400,1000,200,200],['hero',600,1000,200,200],['hero',800,1000,200,200],['hero',1000,1000,200,200]],
+      block:[['hero',0,0,200,200],['hero',200,0,200,200]],
+      hurt:[['hero',0,1200,200,200],['hero',200,1200,200,200],['hero',400,1200,200,200],['hero',600,1200,200,200]],
+      ko:[['hero',0,1400,200,200],['hero',200,1400,200,200],['hero',400,1400,200,200],['hero',600,1400,200,200],['hero',800,1400,200,200],['hero',1000,1400,200,200]],
+      uppercut:[['hero',0,800,200,200],['hero',200,800,200,200],['hero',400,800,200,200],['hero',600,800,200,200],['hero',800,800,200,200],['hero',1000,800,200,200]],
+      crouchAtk:[['hero',0,1000,200,200],['hero',200,1000,200,200],['hero',400,1000,200,200],['hero',600,1000,200,200],['hero',800,1000,200,200],['hero',1000,1000,200,200]],
+      jumpAtk:[['hero',0,400,100,200],['hero',100,400,100,200],['hero',200,400,100,200],['hero',300,400,100,200]],
+    },
+    atks:{
+      light:  {su:4,ac:4,re:8,  dmg:9,  push:100, kb:0,  hw:90, hh:65, hx:55, hy:-90,  snd:'whoosh',anim:'light'},
+      medium: {su:5,ac:5,re:10, dmg:14, push:140, kb:0,  hw:100,hh:75, hx:60, hy:-100, snd:'hit',   anim:'medium'},
+      heavy:  {su:8,ac:6,re:14, dmg:22, push:180, kb:55, hw:130,hh:85, hx:60, hy:-110, snd:'hit',   anim:'heavy'},
+      special:{su:10,ac:26,re:18, dmg:30, push:200, kb:80, hw:300,hh:60, hx:80, hy:-100, snd:'special',anim:'special',proj:true},
+      upper:  {su:4,ac:8,re:12, dmg:20, push:100, kb:120,hw:80, hh:120,hx:40, hy:-130, snd:'uppercut',anim:'uppercut'},
+      crouchA:{su:4,ac:5,re:9,  dmg:10, push:70,  kb:0,  hw:95, hh:50, hx:50, hy:-35,  snd:'whoosh',anim:'crouchAtk'},
+      jumpA:  {su:3,ac:5,re:8,  dmg:12, push:110, kb:35, hw:100,hh:80, hx:50, hy:-80,  snd:'hit',   anim:'jumpAtk'},
+    }
+  }
+];
 
 function drawSpr(anim,idx,cx,cy,flip,scale){
   const f=anim[idx%anim.length]; if(!f)return;
@@ -351,26 +438,6 @@ function drawSpr(anim,idx,cx,cy,flip,scale){
   ctx.drawImage(s,sx,sy,sw,sh,-dw/2,-dh,dw,dh);
   ctx.restore();
 }
-
-// ── Attack Definitions ─────────────────────────────────────────
-const TEK_ATK={
-  light:  {su:3,ac:4,re:7,  dmg:8,  push:90,  kb:0,  hw:90, hh:65, hx:55, hy:-90,  snd:'whoosh',anim:'light'},
-  medium: {su:5,ac:5,re:10, dmg:14, push:140, kb:0,  hw:105,hh:75, hx:65, hy:-100, snd:'hit',   anim:'medium'},
-  heavy:  {su:8,ac:6,re:14, dmg:22, push:180, kb:55, hw:140,hh:90, hx:60, hy:-110, snd:'hit',   anim:'heavy'},
-  special:{su:10,ac:28,re:18,dmg:30,push:200, kb:80, hw:340,hh:65, hx:80, hy:-100, snd:'special',anim:'special',proj:true},
-  upper:  {su:4,ac:8,re:12, dmg:20, push:100, kb:120,hw:80, hh:130,hx:40, hy:-140, snd:'uppercut',anim:'uppercut'},
-  crouchA:{su:4,ac:5,re:9,  dmg:10, push:70,  kb:0,  hw:100,hh:50, hx:55, hy:-35,  snd:'whoosh',anim:'crouchAtk'},
-  jumpA:  {su:3,ac:5,re:8,  dmg:12, push:110, kb:35, hw:100,hh:90, hx:50, hy:-80,  snd:'hit',   anim:'jumpAtk'},
-};
-const LOB_ATK={
-  light:  {su:4,ac:4,re:8,  dmg:9,  push:100, kb:0,  hw:100,hh:70, hx:55, hy:-80,  snd:'whoosh',anim:'light'},
-  medium: {su:6,ac:6,re:11, dmg:16, push:150, kb:10, hw:120,hh:90, hx:65, hy:-100, snd:'hit',   anim:'medium'},
-  heavy:  {su:9,ac:7,re:15, dmg:26, push:200, kb:65, hw:145,hh:100,hx:60, hy:-105, snd:'hit',   anim:'heavy'},
-  special:{su:12,ac:22,re:22,dmg:34,push:240, kb:100,hw:170,hh:140,hx:70, hy:-130, snd:'special',anim:'special',proj:true},
-  upper:  {su:5,ac:8,re:13, dmg:22, push:110, kb:130,hw:90, hh:140,hx:40, hy:-150, snd:'uppercut',anim:'uppercut'},
-  crouchA:{su:5,ac:5,re:10, dmg:11, push:80,  kb:0,  hw:110,hh:55, hx:55, hy:-30,  snd:'whoosh',anim:'crouchAtk'},
-  jumpA:  {su:4,ac:6,re:9,  dmg:14, push:130, kb:45, hw:120,hh:100,hx:50, hy:-70,  snd:'hit',   anim:'jumpAtk'},
-};
 
 // ── AI System ──────────────────────────────────────────────────
 let aiDiff=1, aiCD=0, aiAggr=.5, aiMem={last:'idle'}, aiWP=0, aiSD=1, aiDT=0;
@@ -437,10 +504,10 @@ function cStun(b,n){return n<=1?b:Math.max(.12,b*(1-n*.08));}
 
 // ── Fighter Class ──────────────────────────────────────────────
 class Fighter{
-  constructor(id,x,name,atks,faceDir,isAI,charType){
+  constructor(id,x,def,faceDir,isAI){
     this.id=id;this.x=x;this.y=GROUND;this.vx=0;this.vy=0;
-    this.w=55;this.h=155;this.name=name;this.face=faceDir;
-    this.atks=atks;this.ai=isAI;this.ct=charType;
+    this.w=55;this.h=155;this.def=def;this.name=def.name;this.face=faceDir;
+    this.atks=def.atks;this.ai=isAI;this.ct=def.ct;this.scale=def.scale;
     this.hp=MAX_HP;this.mhp=MAX_HP;this.nrg=0;this.mnrg=MAX_NRG;
     this.st='idle';this.aType=null;this.aFrame=0;this.aHit=false;
     this.hurtT=0;this.blockT=0;this.kbx=0;this.kby=0;
@@ -491,7 +558,7 @@ class Fighter{
           this.aHit=true;this.nrg=Math.min(this.mnrg,this.nrg+15);this._cc=true;this._ccT=.2;
         }
         if(a.proj&&this.aFrame===a.su+2&&this.nrg>=50){
-          const pc=this.ct==='tek'?'#00ffaa':'#ff4422';
+          const pc=this.ct==='tek'?'#00ffaa':this.ct==='lob'?'#ff4422':this.ct==='cat'?'#ff88cc':'#4488ff';
           projs.push({own:this,x:this.x+this.face*65,y:this.y-110,vx:this.face*800,vy:0,w:90,h:25,dmg:a.dmg,alive:true,age:0,c:pc});
           this.nrg-=50;
         }
@@ -541,7 +608,7 @@ class Fighter{
     if(this.st==='jump'){this.jF=this.vy<-200?0:this.vy<200?1:2;}
   }
   getAnim(){
-    const M=this.ct==='tek'?T:L;
+    const M=this.def.map;
     const s=this.st,a=this.aType;
     if(s==='ko')return[M.ko,Math.min(M.ko.length-1,Math.floor(this._koA))];
     if(s==='hurt')return[M.hurt,this.hurtT>.15?0:1];
@@ -562,7 +629,7 @@ class Fighter{
     return[M.idle,this.aF%M.idle.length];
   }
   draw(){
-    const SC=this.ct==='tek'?.85:1.0;
+    const SC=this.scale;
     const[anim,idx]=this.getAnim();
     drawSpr(anim,idx,this.x,this.y,this.face===-1,SC);
     if(this._flash>0){
@@ -612,10 +679,10 @@ function drawHUD(a,b){
     ctx.fillStyle=rdy?'#fff':'#666';ctx.font='bold 8px Courier New';ctx.textAlign='left';
     ctx.fillText(rdy?'SPECIAL READY':'ENERGY',x,ey-1);
   }
-  hBar(p1,a.hp,a.mhp,true,a.name,a.rounds,'#00ff88');
-  eBar(p1,a.nrg,a.mnrg,'#00ffcc',a.nrg>=50);
-  hBar(p2,b.hp,b.mhp,false,b.name,b.rounds,'#ff6644');
-  eBar(p2,b.nrg,b.mnrg,'#ffaa00',b.nrg>=50);
+  hBar(p1,a.hp,a.mhp,true,a.name,a.rounds,a.def.color);
+  eBar(p1,a.nrg,a.mnrg,a.def.color,a.nrg>=50);
+  hBar(p2,b.hp,b.mhp,false,b.name,b.rounds,b.def.color);
+  eBar(p2,b.nrg,b.mnrg,b.def.color,b.nrg>=50);
   ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(W/2-42,10,84,58);
   ctx.fillStyle='#c8a020';ctx.fillRect(W/2-40,12,80,54);
   ctx.strokeStyle='#805010';ctx.lineWidth=2;ctx.strokeRect(W/2-40,12,80,54);
@@ -648,31 +715,32 @@ function drawCS(dt){
   ctx.fillStyle='#ffee00';ctx.font='bold 42px Courier New';ctx.textAlign='center';ctx.fillText('SELECT YOUR FIGHTER',W/2,58);
   ctx.strokeStyle='#c8a020';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(80,72);ctx.lineTo(W-80,72);ctx.stroke();
   ctx.fillStyle='#888';ctx.font='14px Courier New';ctx.fillText(mpMode?'ONLINE MATCH':'1 Player vs CPU',W/2,92);
-  const pn=[{x:320,nm:'TEKNIUM',c:'#00ff88',sub:'Energy Blast \u2022 Fast Combos \u2022 Uppercut',ct:'tek'},
-            {x:W-320,nm:'LOBSTER',c:'#ff6644',sub:'Beam Cannon \u2022 Heavy Damage \u2022 Flying Kick',ct:'lob'}];
-  pn.forEach((p,i)=>{
-    const sel=csCur===i,bx=p.x-160,by=110,bw=320,bh=360;
-    ctx.fillStyle=sel?'rgba(0,30,60,.85)':'rgba(0,10,25,.6)';ctx.fillRect(bx,by,bw,bh);
-    ctx.strokeStyle=sel?p.c:'#333';ctx.lineWidth=sel?3:1;ctx.strokeRect(bx,by,bw,bh);
-    if(sel){ctx.shadowColor=p.c;ctx.shadowBlur=25;ctx.strokeRect(bx,by,bw,bh);ctx.shadowBlur=0;}
-    const M=p.ct==='tek'?T:L;
-    const SC=p.ct==='tek'?.85:1.0;
-    drawSpr(M.idle,Math.floor(csBlink*3)%M.idle.length,p.x,by+bh-90,false,SC*1.4);
-    ctx.fillStyle=sel?p.c:'#777';ctx.font='bold 22px Courier New';ctx.textAlign='center';ctx.fillText(p.nm,p.x,by+bh-55);
-    ctx.fillStyle=sel?'#aaa':'#555';ctx.font='11px Courier New';ctx.fillText(p.sub,p.x,by+bh-37);
-    ctx.fillStyle=sel?'#00ff88':'#ff6644';ctx.font='bold 14px Courier New';ctx.fillText(sel?'\u25C4 YOU \u25BA':'CPU',p.x,by+bh-18);
-    if(sel&&Math.sin(csBlink*6)>0){ctx.fillStyle=p.c;ctx.font='bold 24px Courier New';ctx.fillText('\u25BC',p.x,by+bh+25);}
+  const n=ROSTER.length;
+  const cardW=240, cardH=340;
+  const startX=(W-(n*cardW+(n-1)*30))/2+cardW/2;
+  ROSTER.forEach((ch,i)=>{
+    const x=startX+i*(cardW+30);
+    const sel=csCur===i, bx=x-cardW/2, by=110;
+    ctx.fillStyle=sel?'rgba(0,30,60,.85)':'rgba(0,10,25,.6)';ctx.fillRect(bx,by,cardW,cardH);
+    ctx.strokeStyle=sel?ch.color:'#333';ctx.lineWidth=sel?3:1;ctx.strokeRect(bx,by,cardW,cardH);
+    if(sel){ctx.shadowColor=ch.color;ctx.shadowBlur=25;ctx.strokeRect(bx,by,cardW,cardH);ctx.shadowBlur=0;}
+    const M=ch.map;
+    const SC=ch.scale;
+    drawSpr(M.idle,Math.floor(csBlink*3)%M.idle.length,x,by+cardH-70,false,SC*1.6);
+    ctx.fillStyle=sel?ch.color:'#777';ctx.font='bold 20px Courier New';ctx.textAlign='center';ctx.fillText(ch.name,x,by+cardH-35);
+    ctx.fillStyle=sel?'#aaa':'#555';ctx.font='10px Courier New';ctx.fillText(ch.sub,x,by+cardH-18);
+    ctx.fillStyle=sel?ch.color:'#666';ctx.font='bold 13px Courier New';ctx.fillText(sel?'\u25C4 YOU \u25BA':'CPU',x,by+cardH-2);
+    if(sel&&Math.sin(csBlink*6)>0){ctx.fillStyle=ch.color;ctx.font='bold 20px Courier New';ctx.fillText('\u25BC',x,by+cardH+18);}
   });
-  ctx.fillStyle='#ff4444';ctx.font='bold 60px Courier New';ctx.textAlign='center';ctx.fillText('VS',W/2,320);
   if(!mpMode){
     const dn=['EASY','NORMAL','HARD'],dc=['#44ff44','#ffee00','#ff4444'];
-    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-120,490,240,50);
-    ctx.fillStyle='#aaa';ctx.font='12px Courier New';ctx.textAlign='center';ctx.fillText('DIFFICULTY (W / S)',W/2,502);
-    ctx.fillStyle=dc[aiDiff];ctx.font='bold 20px Courier New';ctx.fillText('\u25C4 '+dn[aiDiff]+' \u25BA',W/2,530);
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-120,470,240,50);
+    ctx.fillStyle='#aaa';ctx.font='12px Courier New';ctx.textAlign='center';ctx.fillText('DIFFICULTY (W / S)',W/2,482);
+    ctx.fillStyle=dc[aiDiff];ctx.font='bold 20px Courier New';ctx.fillText('\u25C4 '+dn[aiDiff]+' \u25BA',W/2,510);
   }else{
-    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-120,490,240,50);
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-120,470,240,50);
     ctx.fillStyle='#ff6644';ctx.font='bold 16px Courier New';ctx.textAlign='center';
-    ctx.fillText('ONLINE MATCH',W/2,520);
+    ctx.fillText('ONLINE MATCH',W/2,500);
   }
   ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(0,H-55,W,55);
   ctx.fillStyle='#aaa';ctx.font='14px Courier New';ctx.textAlign='center';ctx.fillText('A/D choose    '+(mpMode?'':'W/S difficulty    ')+'ENTER fight',W/2,H-32);
@@ -703,10 +771,8 @@ let winner=null, mWinner=null, ftr=[], sRds=[0,0];
 
 function startMatch(pc){
   aiCD=0;aiWP=0;
-  const pN=pc===0?'TEKNIUM':'LOBSTER', cN=pc===0?'LOBSTER':'TEKNIUM';
-  const pA=pc===0?TEK_ATK:LOB_ATK, cA=pc===0?LOB_ATK:TEK_ATK;
-  const pC=pc===0?'tek':'lob', cC=pc===0?'lob':'tek';
-  ftr=[new Fighter(0,300,pN,pA,1,false,pC),new Fighter(1,W-300,cN,cA,-1,true,cC)];
+  const pDef=ROSTER[pc], cDef=ROSTER[(pc+1)%ROSTER.length];
+  ftr=[new Fighter(0,300,pDef,1,false),new Fighter(1,W-300,cDef,-1,true)];
   ftr[0].rounds=sRds[0];ftr[1].rounds=sRds[1];
   roundT=ROUND_TIME;introT=3;projs.length=0;floats.length=0;particles.length=0;
   hitFlash=0;shakeT=0;slowMo=0;
@@ -868,8 +934,8 @@ function loop(ts){
   // ── CHARACTER SELECT ─────────────────────────────────────
   else if(gs==='charSelect'){
     drawCS(dt);
-    if(cjp('a')||cjp('A')||cjp('ArrowLeft')||gjp('l')){csCur=0;sfx('cursor');}
-    if(cjp('d')||cjp('D')||cjp('ArrowRight')||gjp('r')){csCur=1;sfx('cursor');}
+    if(cjp('a')||cjp('A')||cjp('ArrowLeft')||gjp('l')){csCur=(csCur-1+ROSTER.length)%ROSTER.length;sfx('cursor');}
+    if(cjp('d')||cjp('D')||cjp('ArrowRight')||gjp('r')){csCur=(csCur+1)%ROSTER.length;sfx('cursor');}
     if(!mpMode){
       if(cjp('w')||cjp('W')||cjp('ArrowUp')||gjp('u')){aiDiff=Math.max(0,aiDiff-1);sfx('cursor');}
       if(cjp('s')||cjp('S')||cjp('ArrowDown')||gjp('d')){aiDiff=Math.min(2,aiDiff+1);sfx('cursor');}
